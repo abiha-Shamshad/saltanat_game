@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SALTANAT — 2D Lahore Fort</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a0805; font-family: 'Georgia', serif; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; }
+  #gameContainer { position: relative; width: 800px; height: 600px; box-shadow: 0 0 30px rgba(0,0,0,0.8); border-radius: 8px; overflow: hidden; border: 4px solid #8b6914; }
+  canvas { display: block; image-rendering: pixelated; }
+  
+  /* Premium UI Styling */
+  #ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; padding: 16px; display: flex; flex-direction: column; justify-content: space-between; }
+  .panel { background: rgba(26, 15, 8, 0.85); border: 2px solid #8b6914; border-radius: 6px; padding: 12px; color: #f0d080; box-shadow: 0 4px 10px rgba(0,0,0,0.5); backdrop-filter: blur(4px); }
+  
+  /* Top HUD Row */
+  #topHud { display: flex; justify-content: space-between; align-items: flex-start; }
+  
+  /* Character Stats Panel */
+  #hud { width: 200px; font-size: 14px; font-weight: bold; }
+  .stat-row { display: flex; justify-content: space-between; margin-bottom: 6px; }
+  #healthBar { width: 100%; height: 16px; background: #330000; border: 1px solid #8b6914; border-radius: 8px; overflow: hidden; margin-bottom: 8px; box-shadow: inset 0 2px 5px rgba(0,0,0,0.8); }
+  #healthFill { height: 100%; background: linear-gradient(90deg, #cc2200, #ff5533); transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+  
+  /* Info Panel */
+  #floorInfo { text-align: right; font-size: 14px; line-height: 1.6; font-weight: bold; }
+  .highlight { color: #fff; text-shadow: 0 0 5px #ffaa00; }
+  
+  /* Bottom HUD Row */
+  #bottomHud { display: flex; justify-content: space-between; align-items: flex-end; }
+  
+  /* Inventory Panel */
+  #inventoryHud { display: flex; gap: 16px; font-size: 16px; font-weight: bold; background: linear-gradient(180deg, rgba(42,26,16,0.9), rgba(26,15,8,0.9)); }
+  .inv-item { display: flex; align-items: center; gap: 6px; }
+  .inv-item span { color: #fff; }
+  
+  /* Message Log */
+  #messageLog { width: 250px; display: flex; flex-direction: column; gap: 4px; text-align: right; text-shadow: 1px 1px 2px #000; font-size: 13px; font-weight: bold; }
+  .msg { padding: 4px 8px; background: rgba(0,0,0,0.5); border-radius: 4px; border-left: 3px solid #8b6914; animation: slideIn 0.3s ease-out; }
+  @keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+  
+  /* Overlay Screens */
+  #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(10,8,5,0.9); z-index: 10; backdrop-filter: blur(8px); }
+  #overlay h1 { color: #f0c060; font-size: 56px; letter-spacing: 8px; text-shadow: 0 0 30px #c08020; margin-bottom: 10px; font-family: serif; }
+  #overlay .subtitle { color: #c0a050; font-size: 18px; margin-bottom: 40px; letter-spacing: 3px; font-style: italic; }
+  #overlay .controls { background: rgba(26, 15, 8, 0.6); border: 1px solid #8b6914; padding: 20px; border-radius: 8px; color: #d0b070; font-size: 14px; margin-bottom: 40px; line-height: 2; text-align: center; width: 400px; box-shadow: inset 0 0 20px rgba(0,0,0,0.8); }
+  #overlay button { background: linear-gradient(180deg, #8b6914, #4a3008); color: #f0d060; border: 2px solid #e0b040; padding: 15px 50px; font-size: 20px; font-family: 'Georgia', serif; font-weight: bold; cursor: pointer; letter-spacing: 4px; border-radius: 4px; box-shadow: 0 4px 15px rgba(0,0,0,0.6); transition: all 0.2s; }
+  #overlay button:hover { background: linear-gradient(180deg, #b08020, #6a4508); transform: translateY(-2px); box-shadow: 0 6px 20px rgba(180,120,30,0.4); }
+  #overlay button:active { transform: translateY(1px); }
+  .ornament { color: #e0b040; font-size: 24px; margin: 10px 0; text-shadow: 0 0 10px #c08020; }
+</style>
+</head>
+<body>
+<div id="gameContainer">
+  <canvas id="gameCanvas" width="800" height="600"></canvas>
+  
+  <div id="ui">
+    <div id="topHud">
+      <div id="hud" class="panel">
+        <div class="stat-row"><span>Health</span> <span id="hpText" class="highlight">100/100</span></div>
+        <div id="healthBar"><div id="healthFill" style="width:100%"></div></div>
+        <div class="stat-row"><span>Level</span> <span id="lvlText" class="highlight">1</span></div>
+        <div class="stat-row"><span>Damage</span> <span id="atkText" class="highlight">15</span></div>
+      </div>
+      
+      <div id="floorInfo" class="panel">
+        Floor <span id="floorText" class="highlight">1</span><br>
+        Score <span id="scoreText" class="highlight">0</span><br>
+        EXP <span id="expText" class="highlight">0</span>
+      </div>
+    </div>
+    
+    <div id="bottomHud">
+      <div id="inventoryHud" class="panel">
+        <div class="inv-item">🧪 <span id="potionCount">0</span></div>
+        <div class="inv-item">🪙 <span id="goldCount">0</span></div>
+        <div class="inv-item">🗝️ <span id="keyCount">0</span></div>
+      </div>
+      
+      <div id="messageLog"></div>
+    </div>
+  </div>
+  <div id="overlay">
+    <div class="ornament">☽ ✦ ☾</div>
+    <h1>SALTANAT</h1>
+    <div class="subtitle">سلطنت — 2D Lahore Fort Isometric</div>
+    <div class="ornament">━━━━━━━━━━━━━━━━━━━━</div>
+    <div class="controls">
+      WASD / Arrow Keys — Move &nbsp;|&nbsp; Space — Attack<br>
+      E — Use Health Potion &nbsp;|&nbsp; Move into Doors to Unlock<br>
+      Defeat the Final Guard on Floor 5!
+    </div>
+    <button id="startBtn">بسم الله — BEGIN</button>
+  </div>
+</div>
+
+<script>
+// ─── Constants & Globals ─────────────────────────────────────────────────────
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+ctx.imageSmoothingEnabled = true; // Better for high-res AI textures
+
+const TILE = 48; // Base tile scale
+const TILE_WIDTH_HALF = TILE;
+const TILE_HEIGHT_HALF = Math.floor(TILE / 2);
+const Z_HEIGHT = TILE * 1.5; // Wall height
+
+const COLS = 25, ROWS = 18;
+const TILE_FLOOR = 0, TILE_WALL = 1, TILE_DOOR = 2, TILE_EXIT = 3;
+const ITEM_GOLD = 'gold', ITEM_POTION = 'potion', ITEM_KEY = 'key';
+
+let state = 'menu'; 
+let floor = 1, score = 0;
+let map = [], player = {}, enemies = [], items = [], messages = [], keys = {};
+let lastTime = 0, moveTimer = 0, attackAnim = 0;
+let camX = 0, camY = 0;
+const MOVE_DELAY = 0.15;
+
+// ─── Asset Loading ───────────────────────────────────────────────────────────
+const images = {};
+const imageFiles = {
+  character: 'assets/charater.png',
+  enemy: 'assets/enemy.png',
+  archer: 'assets/enemy_arccher.png',
+  djinn: 'assets/enemy_jin.png',
+  boss: 'assets/boss_enemy.png',
+  sword: 'assets/Talwar_Sword.png',
+  floor: 'assets/lahore_marble.png',
+  wall: 'assets/lahore_fresco.png',
+  door: 'assets/lahore_jali.png',
+  gold: 'assets/gold_coins.png',
+  potion: 'assets/health_portion.png'
+};
+
+let loadedCount = 0;
+for (const [key, src] of Object.entries(imageFiles)) {
+  const img = new Image();
+  img.onload = () => { loadedCount++; };
+  img.onerror = () => { loadedCount++; }; // skip missing
+  img.src = src;
+  images[key] = img;
+}
+
+// ─── Map Generation (Game Logic) ──────────────────────────────────────────────
+function generateMap(floorNum) {
+  map = Array.from({length: ROWS}, () => Array(COLS).fill(TILE_WALL));
+  let cx = Math.floor(COLS/2), cy = Math.floor(ROWS/2);
+  const dirs = [[0,1],[0,-1],[1,0],[-1,0]];
+  let steps = 200 + floorNum * 20;
+  map[cy][cx] = TILE_FLOOR;
+  for (let i = 0; i < steps; i++) {
+    const [dx, dy] = dirs[Math.floor(Math.random() * 4)];
+    cx = Math.max(1, Math.min(COLS-2, cx+dx));
+    cy = Math.max(1, Math.min(ROWS-2, cy+dy));
+    map[cy][cx] = TILE_FLOOR;
+    if (Math.random() < 0.2) {
+      for (let ry = 0; ry <= 1; ry++)
+        for (let rx = 0; rx <= 1; rx++)
+          if (cy+ry < ROWS-1 && cx+rx < COLS-1) map[cy+ry][cx+rx] = TILE_FLOOR;
+    }
+  }
+  let floorTiles = getFloorTiles();
+  const doorTile = floorTiles[Math.floor(floorTiles.length * 0.1)];
+  map[doorTile.y][doorTile.x] = TILE_DOOR;
+  const exitTile = floorTiles[floorTiles.length - 1];
+  map[exitTile.y][exitTile.x] = TILE_EXIT;
+}
+
+function getFloorTiles() {
+  const tiles = [];
+  for (let y = 0; y < ROWS; y++)
+    for (let x = 0; x < COLS; x++)
+      if (map[y][x] === TILE_FLOOR) tiles.push({x, y});
+  return tiles;
+}
+
+function findSpawn(avoid=[]) {
+  const tiles = getFloorTiles().filter(t => !avoid.some(a => a.x === t.x && a.y === t.y));
+  return tiles[Math.floor(Math.random() * tiles.length)] || {x:2,y:2};
+}
+
+// ─── Enemies & Items ──────────────────────────────────────────────────────────
+function spawnEnemies(floorNum) {
+  const types = floorNum < 5 ? ['soldier','archer','djinn'] : ['boss'];
+  const count = floorNum === 5 ? 1 : 3 + floorNum * 2;
+  const spawned = [];
+  for (let i = 0; i < count; i++) {
+    const type = floorNum === 5 ? 'boss' : types[Math.floor(Math.random()*types.length)];
+    const pos = findSpawn([{x:player.x,y:player.y}, ...spawned]);
+    if (Math.abs(pos.x-player.x)+Math.abs(pos.y-player.y) < 4) continue;
+    const stats = {
+      soldier: {hp:40+floorNum*10, maxHp:40+floorNum*10, atk:8+floorNum*2, img:'enemy', name:'Mughal Soldier'},
+      archer:  {hp:25+floorNum*8,  maxHp:25+floorNum*8,  atk:12+floorNum*3, img:'archer', name:'Archer'},
+      djinn:   {hp:35+floorNum*12, maxHp:35+floorNum*12, atk:15+floorNum*3, img:'djinn',  name:'Djinn Guard'},
+      boss:    {hp:300,            maxHp:300,             atk:35,            img:'boss',   name:'Darbar-e-Khas Final Guard'},
+    }[type];
+    spawned.push({x:pos.x, y:pos.y});
+    enemies.push({...stats, type, x:pos.x, y:pos.y, id:Math.random(), moveTimer:0, moveDelay:0.6+(Math.random()*0.4), attackTimer:0, flashTimer:0, alive:true});
+  }
+}
+
+function spawnItems(floorNum) {
+  items = [];
+  const tiles = getFloorTiles();
+  const count = 5 + floorNum * 2;
+  for (let i = 0; i < count; i++) {
+    const t = tiles[Math.floor(Math.random() * tiles.length)];
+    const r = Math.random();
+    let type = r < 0.5 ? ITEM_GOLD : r < 0.8 ? ITEM_POTION : ITEM_KEY;
+    items.push({x:t.x, y:t.y, type, collected:false, value: type===ITEM_GOLD ? 10 : 0});
+  }
+}
+
+// ─── A* Pathfinding ──────────────────────────────────────────────────────────
+function heuristic(ax, ay, bx, by) { return Math.abs(ax-bx) + Math.abs(ay-by); }
+function findPath(sx, sy, gx, gy) {
+  const key = (x,y) => y*COLS+x;
+  const open = [{x:sx, y:sy, g:0, h:heuristic(sx,sy,gx,gy), parent:null}];
+  const closed = new Set();
+  const best = {};
+  best[key(sx,sy)] = 0;
+  while (open.length) {
+    open.sort((a,b) => (a.g+a.h)-(b.g+b.h));
+    const cur = open.shift();
+    if (cur.x===gx && cur.y===gy) {
+      const path = []; let n = cur;
+      while (n.parent) { path.unshift({x:n.x,y:n.y}); n=n.parent; }
+      return path;
+    }
+    const k = key(cur.x, cur.y);
+    if (closed.has(k)) continue;
+    closed.add(k);
+    for (const [dx,dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
+      const nx=cur.x+dx, ny=cur.y+dy;
+      if (nx<0||ny<0||nx>=COLS||ny>=ROWS) continue;
+      if (map[ny][nx]===TILE_WALL) continue;
+      if (enemies.some(e=>e.alive&&e.x===nx&&e.y===ny&&(e.x!==gx||e.y!==gy))) continue;
+      const ng = cur.g+1; const nk = key(nx,ny);
+      if (closed.has(nk)) continue;
+      if (best[nk] !== undefined && ng >= best[nk]) continue;
+      best[nk] = ng;
+      open.push({x:nx,y:ny,g:ng,h:heuristic(nx,ny,gx,gy),parent:cur});
+      if (open.length > 300) break;
+    }
+  }
+  return [];
+}
+
+// ─── Input & Combat ──────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => { keys[e.key] = true; keys[e.code] = true; });
+document.addEventListener('keyup', e => { keys[e.key] = false; keys[e.code] = false; });
+
+function tryMove(dx, dy) {
+  const nx = player.x + dx, ny = player.y + dy;
+  if (nx<0||ny<0||nx>=COLS||ny>=ROWS) return;
+  const tile = map[ny][nx];
+  if (tile === TILE_WALL) return;
+  if (tile === TILE_DOOR) {
+    if (player.inventory.key > 0) {
+      player.inventory.key--;
+      map[ny][nx] = TILE_FLOOR;
+      addMsg('Door unlocked! (key used)', '#88ffaa');
+    } else addMsg('Need a key to open this door!', '#ff8844');
+    return;
+  }
+  if (enemies.some(e=>e.alive&&e.x===nx&&e.y===ny)) return;
+  
+  player.x = nx; player.y = ny;
+  if (dx > 0) player.dir = 'right'; else if (dx < 0) player.dir = 'left';
+  else if (dy < 0) player.dir = 'up'; else player.dir = 'down';
+
+  for (const item of items) {
+    if (!item.collected && item.x===nx && item.y===ny) {
+      item.collected = true;
+      if (item.type===ITEM_GOLD) { player.inventory.gold += item.value; addMsg(`+${item.value} Gold`, '#ffdd44'); score += item.value; }
+      if (item.type===ITEM_POTION) { player.inventory.potion++; addMsg('+1 Potion', '#44ff88'); }
+      if (item.type===ITEM_KEY) { player.inventory.key++; addMsg('+1 Key', '#ffaaff'); }
+    }
+  }
+
+  if (tile === TILE_EXIT) nextFloor();
+  updateHUD();
+}
+
+function playerAttack() {
+  const range = player.dir === 'up' ? {x:player.x, y:player.y-1} :
+                player.dir === 'down' ? {x:player.x, y:player.y+1} :
+                player.dir === 'left' ? {x:player.x-1, y:player.y} : {x:player.x+1, y:player.y};
+  attackAnim = 0.3;
+  let hit = false;
+  for (const e of enemies) {
+    if (!e.alive) continue;
+    const dist = Math.abs(e.x-player.x)+Math.abs(e.y-player.y);
+    if ((e.x===range.x&&e.y===range.y) || dist===1) {
+      const dmg = player.atk + Math.floor(Math.random()*8);
+      e.hp -= dmg;
+      e.flashTimer = 0.3;
+      addMsg(`Hit ${e.name} for ${dmg}!`, '#ffdd44');
+      if (e.hp <= 0) {
+        e.alive = false;
+        const expGain = e.type==='boss'?200:15+floor*5;
+        score += expGain; player.exp += expGain;
+        items.push({x:e.x,y:e.y,type:ITEM_GOLD,collected:false,value:50});
+        addMsg(`Defeated! +${expGain} EXP`, '#ffaa00');
+        checkLevelUp();
+        if (e.type==='boss') setTimeout(()=>winGame(), 1500);
+      }
+      hit = true; break;
+    }
+  }
+  if (!hit) addMsg('Missed!', '#aaaaaa');
+}
+
+function checkLevelUp() {
+  while (player.exp >= player.expNext) {
+    player.exp -= player.expNext; player.lvl++;
+    player.atk += 5; player.maxHp += 20; player.hp = Math.min(player.hp+20, player.maxHp);
+    player.expNext = Math.floor(player.expNext * 1.5);
+    addMsg(`⬆ Level Up!`, '#44ffaa'); updateHUD();
+  }
+}
+
+function enemyAttack(e) {
+  const dmg = Math.floor(e.atk * (0.7 + Math.random()*0.6));
+  player.hp -= dmg;
+  addMsg(`${e.name} hits for ${dmg}!`, '#ff6644');
+  updateHUD();
+  if (player.hp <= 0) { player.hp = 0; state = 'dead'; showOverlay('dead'); }
+}
+
+function processInput(dt) {
+  moveTimer -= dt;
+  if (moveTimer > 0) return;
+  let moved = false;
+  if (keys['w']||keys['W']||keys['ArrowUp']) { tryMove(0,-1); moved=true; }
+  if (keys['s']||keys['S']||keys['ArrowDown']) { tryMove(0, 1); moved=true; }
+  if (keys['a']||keys['A']||keys['ArrowLeft']) { tryMove(-1,0); moved=true; }
+  if (keys['d']||keys['D']||keys['ArrowRight']) { tryMove( 1,0); moved=true; }
+  if ((keys[' ']||keys['Space']) && !keys._atkDown) { keys._atkDown=true; playerAttack(); moved=true; }
+  if (!keys[' ']&&!keys['Space']) keys._atkDown=false;
+  if ((keys['e']||keys['E']) && !keys._useDown) {
+    keys._useDown=true;
+    if (player.inventory.potion > 0) {
+      player.inventory.potion--; player.hp = Math.min(player.hp+40, player.maxHp);
+      addMsg(`Drank potion!`, '#44ff88'); updateHUD();
+    }
+  }
+  if (!keys['e']&&!keys['E']) keys._useDown=false;
+  if (moved) moveTimer = MOVE_DELAY;
+}
+
+function updateEnemies(dt) {
+  for (const e of enemies) {
+    if (!e.alive) continue;
+    if (e.flashTimer > 0) e.flashTimer -= dt;
+    e.moveTimer -= dt;
+    if (e.moveTimer > 0) continue;
+    e.moveTimer = e.moveDelay;
+
+    const dist = Math.abs(e.x-player.x)+Math.abs(e.y-player.y);
+    if (dist === 1) {
+      e.attackTimer -= dt;
+      if (e.attackTimer <= 0) { enemyAttack(e); e.attackTimer = 1.2; }
+    } else if (dist <= 10) {
+      const path = findPath(e.x, e.y, player.x, player.y);
+      if (path.length > 0 && !enemies.some(oe=>oe!==e&&oe.alive&&oe.x===path[0].x&&oe.y===path[0].y)) {
+        e.x = path[0].x; e.y = path[0].y;
+      }
+    }
+  }
+}
+
+// ─── 2D Canvas Isometric Rendering Engine ─────────────────────────────────────
+function cartesianToIsometric(x, y) {
+  return {
+    x: (x - y) * TILE_WIDTH_HALF,
+    y: (x + y) * TILE_HEIGHT_HALF
+  };
+}
+
+function updateCamera() {
+  const pIso = cartesianToIsometric(player.x, player.y);
+  camX += (pIso.x - canvas.width/2 - camX) * 0.1;
+  camY += (pIso.y - canvas.height/2 + Z_HEIGHT/2 - camY) * 0.1;
+}
+
+function drawIsometricBlock(img, px, py, isWall) {
+  const z = isWall ? Z_HEIGHT : 0;
+  
+  if (isWall) {
+    // Draw Left Face (Shaded)
+    const leftGrad = ctx.createLinearGradient(px, py, px - TILE_WIDTH_HALF, py - z);
+    leftGrad.addColorStop(0, '#8a5a44');
+    leftGrad.addColorStop(1, '#5a3a24');
+    ctx.fillStyle = leftGrad;
+    ctx.beginPath();
+    ctx.moveTo(px, py);
+    ctx.lineTo(px - TILE_WIDTH_HALF, py - TILE_HEIGHT_HALF);
+    ctx.lineTo(px - TILE_WIDTH_HALF, py - TILE_HEIGHT_HALF - z);
+    ctx.lineTo(px, py - z);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Draw Right Face (Lit)
+    const rightGrad = ctx.createLinearGradient(px, py, px + TILE_WIDTH_HALF, py - z);
+    rightGrad.addColorStop(0, '#eeddcc');
+    rightGrad.addColorStop(1, '#ccaabb');
+    ctx.fillStyle = rightGrad;
+    ctx.beginPath();
+    ctx.moveTo(px, py);
+    ctx.lineTo(px + TILE_WIDTH_HALF, py - TILE_HEIGHT_HALF);
+    ctx.lineTo(px + TILE_WIDTH_HALF, py - TILE_HEIGHT_HALF - z);
+    ctx.lineTo(px, py - z);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+
+  // Draw Top Face (Floor or top of wall)
+  if (img && img.complete && !isWall) {
+    ctx.save();
+    ctx.translate(px, py - TILE_HEIGHT_HALF * 2 - z);
+    // Isometric projection matrix
+    ctx.transform(1, 0.5, -1, 0.5, 0, 0);
+    // The textures are 512x512, scale them down
+    ctx.drawImage(img, 0, 0, img.width, img.height, 0, 0, TILE*1.414, TILE*1.414);
+    ctx.restore();
+  } else if (!isWall) {
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.moveTo(px, py - TILE_HEIGHT_HALF * 2 - z);
+    ctx.lineTo(px + TILE_WIDTH_HALF, py - TILE_HEIGHT_HALF - z);
+    ctx.lineTo(px, py - z);
+    ctx.lineTo(px - TILE_WIDTH_HALF, py - TILE_HEIGHT_HALF - z);
+    ctx.closePath();
+    ctx.fill();
+  }
+}
+
+function drawTile(img, x, y) {
+  const pIso = cartesianToIsometric(x, y);
+  const px = pIso.x - camX;
+  const py = pIso.y - camY + TILE_HEIGHT_HALF;
+
+  const t = map[y][x];
+  const isWall = t === TILE_WALL || t === TILE_DOOR;
+  
+  if (isWall) {
+    // Wall and doors use the wall texture logic
+    const tex = t === TILE_DOOR ? images.door : images.wall;
+    drawIsometricBlock(tex, px, py, true);
+  } else {
+    // Floor uses floor texture
+    drawIsometricBlock(images.floor, px, py, false);
+  }
+}
+
+function drawSprite(img, x, y, size=TILE*1.5, flash=false) {
+  const pIso = cartesianToIsometric(x, y);
+  const px = pIso.x - camX - (size / 2);
+  const py = pIso.y - camY - size + (TILE_HEIGHT_HALF / 2);
+
+  if (flash) ctx.globalAlpha = 0.5;
+  if (img && img.complete && img.naturalWidth > 0) {
+    ctx.drawImage(img, px, py, size, size);
+  } else {
+    ctx.fillStyle = flash ? '#ff4444' : '#888';
+    ctx.fillRect(px, py, size, size);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawHealthBar(e) {
+  const pIso = cartesianToIsometric(e.x, e.y);
+  const px = pIso.x - camX - TILE_WIDTH_HALF / 2;
+  const py = pIso.y - camY - TILE*1.2;
+  const pct = e.hp / e.maxHp;
+  ctx.fillStyle = '#330000';
+  ctx.fillRect(px, py, TILE, 4);
+  ctx.fillStyle = pct > 0.5 ? '#44cc22' : pct > 0.25 ? '#ddaa00' : '#cc2200';
+  ctx.fillRect(px, py, TILE*pct, 4);
+}
+
+function render() {
+  // Bright warm sky
+  ctx.fillStyle = '#dceaf5';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Add bright ambient glow
+  const grad = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+  grad.addColorStop(0, '#ffffff');
+  grad.addColorStop(1, '#ffeedd');
+  ctx.fillStyle = grad;
+  ctx.globalAlpha = 0.5;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.globalAlpha = 1;
+
+  // Render from back to front
+  for (let y = 0; y < ROWS; y++) {
+    for (let x = 0; x < COLS; x++) {
+      drawTile(null, x, y); // draws floor/wall base
+
+      const t = map[y][x];
+      if (t === TILE_EXIT) {
+        const pIso = cartesianToIsometric(x, y);
+        const px = pIso.x - camX, py = pIso.y - camY;
+        
+        // Draw pulsing floor base
+        ctx.fillStyle = `rgba(0,255,150,${0.4+0.2*Math.sin(Date.now()/200)})`;
+        ctx.beginPath();
+        ctx.moveTo(px, py - TILE_HEIGHT_HALF);
+        ctx.lineTo(px + TILE_WIDTH_HALF, py);
+        ctx.lineTo(px, py + TILE_HEIGHT_HALF);
+        ctx.lineTo(px - TILE_WIDTH_HALF, py);
+        ctx.fill();
+
+        // Draw floating glowing portal above the floor
+        const bounce = Math.sin(Date.now() / 250) * 10;
+        const portalY = py - Z_HEIGHT + bounce;
+        
+        ctx.globalCompositeOperation = 'screen';
+        const grad = ctx.createRadialGradient(px, portalY, 0, px, portalY, TILE * 1.5);
+        grad.addColorStop(0, 'rgba(150, 255, 200, 0.9)');
+        grad.addColorStop(0.3, 'rgba(0, 200, 100, 0.6)');
+        grad.addColorStop(1, 'rgba(0, 255, 100, 0)');
+        
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(px, portalY, TILE * 1.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalCompositeOperation = 'source-over';
+
+        // Draw a prominent arrow
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 36px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.shadowColor = '#00ff88';
+        ctx.shadowBlur = 20;
+        ctx.fillText('▼', px, portalY + 4);
+        ctx.shadowBlur = 0; // reset
+      }
+
+      for (const item of items) {
+        if (!item.collected && item.x === x && item.y === y) {
+          const img = item.type===ITEM_GOLD ? images.gold :
+                      item.type===ITEM_POTION ? images.potion : null;
+          if (img && img.complete) drawSprite(img, item.x, item.y, 24);
+        }
+      }
+
+      for (const e of enemies) {
+        if (e.alive && e.x === x && e.y === y) {
+          const eImg = {soldier:images.enemy, archer:images.archer, djinn:images.djinn, boss:images.boss}[e.type];
+          drawSprite(eImg, e.x, e.y, e.type==='boss'?TILE*2:TILE*1.5, e.flashTimer > 0);
+          drawHealthBar(e);
+        }
+      }
+
+      if (player.x === x && player.y === y) {
+        drawSprite(images.character, player.x, player.y, TILE*1.5, false);
+        if (attackAnim > 0 && images.sword && images.sword.complete) {
+          const dirs = {up:[0,-1],down:[0,1],left:[-1,0],right:[1,0]};
+          const d = dirs[player.dir] || [0,1];
+          const tx = player.x + d[0], ty = player.y + d[1];
+          const pIso = cartesianToIsometric(tx, ty);
+          ctx.globalAlpha = attackAnim/0.3*0.8;
+          ctx.drawImage(images.sword, pIso.x - camX - 16, pIso.y - camY - 32, TILE, TILE);
+          ctx.globalAlpha = 1;
+        }
+      }
+    }
+  }
+
+  drawMinimap();
+}
+
+function drawMinimap() {
+  const mx = canvas.width - 110, my = 40;
+  const ms = 4;
+  ctx.globalAlpha = 0.7;
+  ctx.fillStyle = '#0a0805';
+  ctx.fillRect(mx-2, my-2, COLS*ms+4, ROWS*ms+4);
+  for (let y=0; y<ROWS; y++) for (let x=0; x<COLS; x++) {
+    const t = map[y][x];
+    ctx.fillStyle = t===TILE_WALL?'#cc7766': t===TILE_EXIT?'#44ff88': t===TILE_DOOR?'#aa6622':'#eeddcc';
+    ctx.fillRect(mx+x*ms, my+y*ms, ms-1, ms-1);
+  }
+  ctx.fillStyle = '#ffdd00';
+  ctx.fillRect(mx+player.x*ms, my+player.y*ms, ms, ms);
+  ctx.fillStyle = '#ff4422';
+  for (const e of enemies) if (e.alive) ctx.fillRect(mx+e.x*ms, my+e.y*ms, ms-1, ms-1);
+  ctx.globalAlpha = 1;
+}
+
+// ─── Core Game Flow ──────────────────────────────────────────────────────────
+function nextFloor() {
+  if (floor >= 5) { winGame(); return; }
+  floor++;
+  addMsg(`⬇ Descending...`, '#88ddff');
+  generateMap(floor);
+  const spawn = findSpawn([]);
+  player.x = spawn.x; player.y = spawn.y;
+  enemies = []; items = [];
+  spawnEnemies(floor); spawnItems(floor);
+  updateHUD();
+}
+
+function startGame() {
+  floor = 1; score = 0;
+  player = { hp:100, maxHp:100, atk:15, lvl:1, exp:0, expNext:30, inventory:{gold:0,potion:2,key:1}, dir:'down' };
+  generateMap(floor);
+  const spawn = findSpawn([]);
+  player.x = spawn.x; player.y = spawn.y;
+  const pIso = cartesianToIsometric(player.x, player.y);
+  camX = pIso.x - canvas.width/2;
+  camY = pIso.y - canvas.height/2 + Z_HEIGHT/2;
+  enemies = []; items = [];
+  spawnEnemies(floor); spawnItems(floor);
+  messages = [];
+  updateHUD();
+  state = 'playing';
+  document.getElementById('overlay').style.display = 'none';
+  requestAnimationFrame(gameLoop);
+}
+
+function winGame() { state = 'win'; showOverlay('win'); }
+
+function updateHUD() {
+  document.getElementById('hpText').textContent = `${Math.max(0,player.hp)}/${player.maxHp}`;
+  document.getElementById('healthFill').style.width = `${(player.hp/player.maxHp)*100}%`;
+  document.getElementById('atkText').textContent = player.atk;
+  document.getElementById('lvlText').textContent = player.lvl;
+  document.getElementById('floorText').textContent = floor;
+  document.getElementById('scoreText').textContent = score;
+  document.getElementById('expText').textContent = `${player.exp}/${player.expNext}`;
+  document.getElementById('potionCount').textContent = player.inventory.potion;
+  document.getElementById('goldCount').textContent = player.inventory.gold;
+  document.getElementById('keyCount').textContent = player.inventory.key;
+}
+
+function addMsg(text, color='#f0d080') {
+  messages.unshift({text, color, age:0});
+  if (messages.length > 5) messages.pop();
+  document.getElementById('messageLog').innerHTML = messages.map(m =>
+    `<div class="msg" style="color:${m.color};opacity:${Math.max(0,1-m.age/5)}">${m.text}</div>`
+  ).join('');
+}
+
+function showOverlay(type) {
+  const ov = document.getElementById('overlay');
+  ov.style.display = 'flex';
+  ov.innerHTML = type === 'dead' ?
+    `<div class="ornament">☽ ✦ ☾</div><h1 style="color:#ff4422">SHAHEED</h1><div class="subtitle">The warrior has fallen...</div>
+     <button onclick="location.reload()">Try Again</button>` :
+    `<div class="ornament">☽ ✦ ☾</div><h1 style="color:#44ffaa">FATAH!</h1><div class="subtitle">Victory! The Palace is Yours!</div>
+     <button onclick="location.reload()">Play Again</button>`;
+}
+
+function gameLoop(ts) {
+  if (state !== 'playing') return;
+  const dt = Math.min((ts - lastTime)/1000, 0.1);
+  lastTime = ts;
+
+  processInput(dt);
+  updateEnemies(dt);
+  if (attackAnim > 0) attackAnim -= dt;
+  for (const m of messages) m.age += dt;
+  document.getElementById('messageLog').innerHTML = messages.map(m =>
+    `<div class="msg" style="color:${m.color};opacity:${Math.max(0,1-m.age/5)}">${m.text}</div>`
+  ).join('');
+
+  updateCamera();
+  render();
+
+  requestAnimationFrame(gameLoop);
+}
+
+// ─── Start ───────────────────────────────────────────────────────────────────
+document.getElementById('startBtn').addEventListener('click', () => {
+  lastTime = performance.now();
+  startGame();
+});
+</script>
+</body>
+</html>
